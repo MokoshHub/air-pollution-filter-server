@@ -1,0 +1,8 @@
+.gitconfig
+pyvenv.cfg
+Scripts
+Lib
+Include
+*/__pycache__
+*/.env
+*/uploaded_images
