@@ -43,7 +43,9 @@ def load_image(image_name):
 @app.route('/', methods=['POST'])
 def get_data():
     uploaded_file = request.files['file']
+
     uploaded_file.save(os.path.join(app.config['UPLOAD_FOLDER'], uploaded_file.filename))
+    uploaded_file.close()
 
     latitude = request.form['lat']
     longitude = request.form['lon']
@@ -86,6 +88,8 @@ def send_image(image_name):
 
         for image_path in result:
             encoded_imges.append(get_response_image(image_path))
+
+        image_path = ''
 
         # delete images from local storage
         os.remove(os.path.join(app.config['UPLOAD_FOLDER'], 'filtered_' + image_name))
