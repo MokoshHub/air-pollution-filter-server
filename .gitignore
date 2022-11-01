@@ -1,4 +1,5 @@
 .gitconfig
+.vscode
 pyvenv.cfg
 Scripts
 Lib

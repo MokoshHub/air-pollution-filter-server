@@ -42,31 +42,37 @@ def load_image(image_name):
 
 @app.route('/', methods=['POST'])
 def get_data():
-    uploaded_file = request.files['file']
+    try:
+        uploaded_file = request.files['file']
 
-    uploaded_file.save(os.path.join(app.config['UPLOAD_FOLDER'], uploaded_file.filename))
-    uploaded_file.close()
+        uploaded_file.save(os.path.join(app.config['UPLOAD_FOLDER'], uploaded_file.filename))
+        uploaded_file.close()
 
-    latitude = request.form['lat']
-    longitude = request.form['lon']
+        latitude = request.form['lat']
+        longitude = request.form['lon']
 
-    location_aqi = latlon2aqi(latitude, longitude)
-    location_place = latlon2address(latitude, longitude)
+        location_aqi = latlon2aqi(latitude, longitude)
+        location_place = latlon2address(latitude, longitude)
 
-    if location_aqi == -1:
-        response = make_response("I'm a teapot", 418)
+        if location_aqi == -1:
+            response = make_response("I'm a teapot", 418)
+            response.mimetype = "text/plain"
+            os.remove(os.path.join(app.config['UPLOAD_FOLDER'], uploaded_file.filename))
+            return response
+
+        processed_image = process_image((os.path.join(app.config['UPLOAD_FOLDER'], uploaded_file.filename)), location_place, location_aqi)
+        processed_image.save(os.path.join(app.config['UPLOAD_FOLDER'], 'filtered_' + uploaded_file.filename))
+        # cv2.imwrite(os.path.join(app.config['UPLOAD_FOLDER'], 'filtered_' + uploaded_file.filename), processed_image)
+
+        original_image = process_image((os.path.join(app.config['UPLOAD_FOLDER'], uploaded_file.filename)), location_place, location_aqi, True)
+        original_image.save(os.path.join(app.config['UPLOAD_FOLDER'], uploaded_file.filename))
+
+        response = make_response("Success!", 200)
         response.mimetype = "text/plain"
-        return response
-
-    processed_image = process_image((os.path.join(app.config['UPLOAD_FOLDER'], uploaded_file.filename)), location_place, location_aqi)
-    processed_image.save(os.path.join(app.config['UPLOAD_FOLDER'], 'filtered_' + uploaded_file.filename))
-    # cv2.imwrite(os.path.join(app.config['UPLOAD_FOLDER'], 'filtered_' + uploaded_file.filename), processed_image)
-
-    original_image = process_image((os.path.join(app.config['UPLOAD_FOLDER'], uploaded_file.filename)), location_place, location_aqi, True)
-    original_image.save(os.path.join(app.config['UPLOAD_FOLDER'], uploaded_file.filename))
-
-    response = make_response("Success!", 200)
-    response.mimetype = "text/plain"
+    except:
+        os.remove(os.path.join(app.config['UPLOAD_FOLDER'], uploaded_file.filename))
+        response = make_response("Internal error", 500)
+        response.mimetype = "text/plain"
 
     return response
 
@@ -136,12 +142,14 @@ def latlon2aqi(lat, lon):
     # print ('Adresa senzora jeeeee ' + latlon2address(closest_sensor[0], closest_sensor[1]))
     return max(closest_sensor[2], closest_sensor[3])
 
-
 def calc_aqi(sensor):
+    
     p1 = sensor['sensordatavalues'][0]['value'] if sensor['sensordatavalues'][0]['value_type'] == 'P1' else \
     sensor['sensordatavalues'][1]['value']
+
     p2 = sensor['sensordatavalues'][0]['value'] if sensor['sensordatavalues'][0]['value_type'] == 'P2' else \
     sensor['sensordatavalues'][1]['value']
+
     p1 = float(p1)
     p2 = float(p2)
 
