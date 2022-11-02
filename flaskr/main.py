@@ -144,17 +144,25 @@ def latlon2aqi(lat, lon):
 
 def calc_aqi(sensor):
     
-    p1 = sensor['sensordatavalues'][0]['value'] if sensor['sensordatavalues'][0]['value_type'] == 'P1' else \
-    sensor['sensordatavalues'][1]['value']
+    if sensor['sensordatavalues'][0]['value_type'] == 'P1':
+        p1 = sensor['sensordatavalues'][0]['value']
+    elif sensor['sensordatavalues'][1]['value_type'] == 'P1':
+        p1 = sensor['sensordatavalues'][1]['value']
+    else:
+        p1 = 0
 
-    p2 = sensor['sensordatavalues'][0]['value'] if sensor['sensordatavalues'][0]['value_type'] == 'P2' else \
-    sensor['sensordatavalues'][1]['value']
+    if sensor['sensordatavalues'][0]['value_type'] == 'P2':
+        p2 = sensor['sensordatavalues'][0]['value']
+    elif sensor['sensordatavalues'][1]['value_type'] == 'P2':
+        p2 = sensor['sensordatavalues'][1]['value']
+    else:
+        p2 = 0
 
     p1 = float(p1)
     p2 = float(p2)
 
     def get_p2_formula_data(conc):
-        conc = int(conc)
+        # conc = float(conc)
         if 0 < conc <= 12:
             return 0, 12, 0, 50
         elif 12 < conc <= 35.5:
@@ -172,6 +180,7 @@ def calc_aqi(sensor):
             return 500, 1000, 500, 1000
 
     def get_p1_formula_data(conc):
+        # conc = float(conc)
         if 0 < conc <= 55:
             return 0, 55, 0, 50
         elif 55 < conc <= 155:
