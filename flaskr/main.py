@@ -11,9 +11,14 @@ from dotenv import load_dotenv
 from geopy.geocoders import GoogleV3
 load_dotenv()
 import requests
+import logging
+import google.cloud.logging
 
 if (not os.path.exists(os.path.join(os.getenv('FLASKR_ROOT'), 'uploaded_images'))):
     os.mkdir(os.path.join(os.getenv('FLASKR_ROOT'), 'uploaded_images'))
+
+client = google.cloud.logging.Client()
+client.setup_logging()
 
 app = Flask(__name__, instance_relative_config=True, static_folder='./static', template_folder='./static')
 # app = Flask(__name__, instance_relative_config=True)
@@ -69,7 +74,10 @@ def get_data():
 
         response = make_response("Success!", 200)
         response.mimetype = "text/plain"
-    except:
+        logging.info("Success!")
+    except Exception as e:
+        logging.error(e)
+
         os.remove(os.path.join(app.config['UPLOAD_FOLDER'], uploaded_file.filename))
         response = make_response("Internal error", 500)
         response.mimetype = "text/plain"
