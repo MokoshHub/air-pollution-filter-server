@@ -76,7 +76,7 @@ def get_data():
         response.mimetype = "text/plain"
         logging.info("Success!")
     except Exception as e:
-        logging.error(e)
+        logging.error(e, exc_info=True)
 
         os.remove(os.path.join(app.config['UPLOAD_FOLDER'], uploaded_file.filename))
         response = make_response("Internal error", 500)
@@ -147,27 +147,39 @@ def latlon2aqi(lat, lon):
     if len(data) == 0:
         return -1
     closest_sensor = sort_closest_data(lat, lon, data)[0]
-    # print ('Adresa senzora jeeeee ' + latlon2address(closest_sensor[0], closest_sensor[1]))
     return max(closest_sensor[2], closest_sensor[3])
 
 def calc_aqi(sensor):
     
-    if sensor['sensordatavalues'][0]['value_type'] == 'P1':
-        p1 = sensor['sensordatavalues'][0]['value']
-    elif sensor['sensordatavalues'][1]['value_type'] == 'P1':
-        p1 = sensor['sensordatavalues'][1]['value']
-    else:
-        p1 = 0
+    try:
+        if sensor['sensordatavalues'][0]['value_type'] == 'P1':
+            p1 = sensor['sensordatavalues'][0]['value']
+        elif sensor['sensordatavalues'][1]['value_type'] == 'P1':
+            p1 = sensor['sensordatavalues'][1]['value']
 
-    if sensor['sensordatavalues'][0]['value_type'] == 'P2':
-        p2 = sensor['sensordatavalues'][0]['value']
-    elif sensor['sensordatavalues'][1]['value_type'] == 'P2':
-        p2 = sensor['sensordatavalues'][1]['value']
-    else:
-        p2 = 0
+        # remove outliers from data
+        if float(p1) >= 1999.90:
+            p1 = None
+    except:
+        p1 = None
 
-    p1 = float(p1)
-    p2 = float(p2)
+    try:
+        if sensor['sensordatavalues'][0]['value_type'] == 'P2':
+            p2 = sensor['sensordatavalues'][0]['value']
+        elif sensor['sensordatavalues'][1]['value_type'] == 'P2':
+            p2 = sensor['sensordatavalues'][1]['value']
+
+        # remove outliers from data
+        if float(p2) >= 999.90:
+            p2 = None
+    except:
+        p2 = None
+
+    if p1 != None and p2 != None:
+        p1 = float(p1)
+        p2 = float(p2)
+    else:
+        return -1, -1
 
     def get_p2_formula_data(conc):
         # conc = float(conc)
@@ -221,6 +233,8 @@ def filter_non_air_sensors(data):
 
 
 def sensor_data_to_loc_aqi(data):
+    # TODO
+    # Catch p1 p2 none/-2 values !!!
     return list(
         map(lambda x: (float(x['location']['latitude']), float(x['location']['longitude']), *calc_aqi(x)), data))
 
