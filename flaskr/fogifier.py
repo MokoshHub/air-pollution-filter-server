@@ -163,6 +163,13 @@ def add_frame_and_tab(image, pollution_level=100):
                           tab_coords["right"],
                           tab_coords["bottom"]),
                           radius=10,
+                          fill=(*fill_color, 127))
+  
+  draw.rounded_rectangle((tab_coords["left"],
+                          tab_coords["top"] * 0.95,
+                          tab_coords["right"],
+                          tab_coords["bottom"]),
+                          radius=10,
                           fill=fill_color)
 
   image_with_borders = cv.cvtColor(np.asarray(image_with_borders), cv.COLOR_RGBA2BGR)
@@ -198,14 +205,14 @@ def write_overlay_text(image, location, timestamp, pollution_level, typeface):
   aqi_text_width, aqi_text_height = draw.textsize(aqi_text, font=aqi_text_font)
   aqi_number_text_width, aqi_number_text_height = draw.textsize(aqi_values_text, font=aqi_text_font)
 
-  draw.text(((image.width - aqi_text_width) / 2 - aqi_number_text_width / 2, ((image.height - aqi_text_height) * 0.8675)), 
+  draw.text(((image.width - aqi_text_width) / 2 - aqi_number_text_width / 2, ((image.height - aqi_text_height) * 0.86)), 
             aqi_text, 
             fill="#ffffff", 
             font=aqi_text_font)
   
-  draw.text(((image.width - aqi_number_text_width) / 2 + aqi_text_width / 2, ((image.height - aqi_text_height) * 0.8675)), 
+  draw.text(((image.width - aqi_number_text_width) / 2 + aqi_text_width / 2, ((image.height - aqi_text_height) * 0.86)), 
             aqi_values_text, 
-            fill=COLORS[calculate_pollution_rating(pollution_level)], # this is horrible, try to figure out a cleaner way
+            fill=COLORS[calculate_pollution_rating(pollution_level)],
             font=aqi_text_font)
 
   draw = ImageDraw.Draw(image)
@@ -215,7 +222,7 @@ def write_overlay_text(image, location, timestamp, pollution_level, typeface):
                                                                    image.height, 
                                                                    typeface))
   text_width, text_height = draw.textsize(location_text, font=location_text_font)
-  draw.text(((image.width - text_width) / 2, ((image.height - text_height) * 0.94)), 
+  draw.text(((image.width - text_width) / 2, ((image.height - text_height) * 0.93625)), 
             location_text, 
             fill="#ffffff", 
             font=location_text_font)
