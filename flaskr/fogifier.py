@@ -1,5 +1,6 @@
 import os
 import random
+from datetime import datetime
 import cv2 as cv
 from math import log
 from skimage import io
@@ -114,7 +115,7 @@ def add_frame_and_tab(image, pollution_level=100):
   blur_intensity = 5
 
   image_with_borders = ImageOps.expand(image,border=(5,5),fill=fill_color)
-  height_factor = max(0.825, 1 - (image_with_borders.height / image_with_borders.width))
+  height_factor = max(0.775, 1 - (image_with_borders.height / image_with_borders.width))
   # print(1 - (image_with_borders.height / image_with_borders.width))
   # print(height_factor)
 
@@ -158,7 +159,7 @@ def add_frame_and_tab(image, pollution_level=100):
                           fill=(0, 0, 0, 127))
   
   draw.rounded_rectangle((tab_coords["left"],
-                          tab_coords["top"] * 0.95,
+                          tab_coords["top"] * 0.9,
                           tab_coords["right"],
                           tab_coords["bottom"]),
                           radius=10,
@@ -183,7 +184,7 @@ def find_font_size(text, text_size_goal, image_size, typeface, debug=False):
 
   return target_font_size
 
-def write_overlay_text(image, location, pollution_level, typeface):
+def write_overlay_text(image, location, timestamp, pollution_level, typeface):
 
   image = Image.fromarray(image)
   draw = ImageDraw.Draw(image)
@@ -197,12 +198,12 @@ def write_overlay_text(image, location, pollution_level, typeface):
   aqi_text_width, aqi_text_height = draw.textsize(aqi_text, font=aqi_text_font)
   aqi_number_text_width, aqi_number_text_height = draw.textsize(aqi_values_text, font=aqi_text_font)
 
-  draw.text(((image.width - aqi_text_width) / 2 - aqi_number_text_width / 2, ((image.height - aqi_text_height) * 0.9125)), 
+  draw.text(((image.width - aqi_text_width) / 2 - aqi_number_text_width / 2, ((image.height - aqi_text_height) * 0.8675)), 
             aqi_text, 
             fill="#ffffff", 
             font=aqi_text_font)
   
-  draw.text(((image.width - aqi_number_text_width) / 2 + aqi_text_width / 2, ((image.height - aqi_text_height) * 0.9125)), 
+  draw.text(((image.width - aqi_number_text_width) / 2 + aqi_text_width / 2, ((image.height - aqi_text_height) * 0.8675)), 
             aqi_values_text, 
             fill=COLORS[calculate_pollution_rating(pollution_level)], # this is horrible, try to figure out a cleaner way
             font=aqi_text_font)
@@ -214,10 +215,17 @@ def write_overlay_text(image, location, pollution_level, typeface):
                                                                    image.height, 
                                                                    typeface))
   text_width, text_height = draw.textsize(location_text, font=location_text_font)
-  draw.text(((image.width - text_width) / 2, ((image.height - text_height) * 0.99)), 
+  draw.text(((image.width - text_width) / 2, ((image.height - text_height) * 0.94)), 
             location_text, 
             fill="#ffffff", 
             font=location_text_font)
+  
+  timestamp_text_font = location_text_font
+  text_width, text_height = draw.textsize(timestamp, font=timestamp_text_font)
+  draw.text(((image.width - text_width) / 2, ((image.height - text_height) * 0.99)), 
+            timestamp, 
+            fill="#ffffff", 
+            font=timestamp_text_font)
 
   image = np.array(image)
 
@@ -226,12 +234,15 @@ def write_overlay_text(image, location, pollution_level, typeface):
 
 def process_image(image_path, location, pollution_level, original=False, debug=False):
 
+    timestamp = datetime.now()
+    timestamp = timestamp.strftime("%d/%m %H:%M")
+
     # This is the "main" method
     
     if original:
       raw_image = load_image(image_path)
       framed_image = add_frame_and_tab(raw_image, pollution_level)
-      texted_image = write_overlay_text(framed_image, location.upper(), pollution_level, os.path.join(os.getenv('FLASKR_ROOT'), "static", "assets", "Roboto-Light.ttf"))
+      texted_image = write_overlay_text(framed_image, location.upper(), timestamp, pollution_level, os.path.join(os.getenv('FLASKR_ROOT'), "static", "assets", "Roboto-Light.ttf"))
       final_image = texted_image
 
     else:
@@ -247,7 +258,7 @@ def process_image(image_path, location, pollution_level, original=False, debug=F
       raw_image = load_image(image_path)
       fogified_image = fogify_image(raw_image, pollution_level, os.path.join(os.getenv('FLASKR_ROOT'), "Fogs", fog_overlay_img), fog_opacity)
       framed_image = add_frame_and_tab(fogified_image, pollution_level)
-      texted_image = write_overlay_text(framed_image, location.upper(), pollution_level, os.path.join(os.getenv('FLASKR_ROOT'), "static", "assets", "Roboto-Light.ttf"))
+      texted_image = write_overlay_text(framed_image, location.upper(), timestamp, pollution_level, os.path.join(os.getenv('FLASKR_ROOT'), "static", "assets", "Roboto-Light.ttf"))
       final_image = texted_image
 
     if debug:
