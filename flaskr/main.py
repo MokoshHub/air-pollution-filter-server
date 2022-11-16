@@ -4,6 +4,7 @@ from math import cos, asin, sqrt
 import sys
 from PIL import Image
 import cv2
+from datetime import datetime
 from fogifier import process_image
 from flask import Flask, jsonify, redirect, request, make_response, render_template
 from flask_cors import CORS, cross_origin
@@ -36,14 +37,14 @@ app.config.from_mapping(
 @app.route('/', methods=['GET'])
 @cross_origin()
 def hello():
-    # return redirect('http://localhost:4200/')
-    return render_template('index.html')
+    return redirect('http://localhost:4200/')
+    # return render_template('index.html')
     
 # render website page with image
 @app.route('/image/<image_name>')
 def load_image(image_name):
-    # return redirect('http://localhost:4200/')
-    return render_template('index.html')
+    return redirect('http://localhost:4200/')
+    # return render_template('index.html')
 
 @app.route('/', methods=['POST'])
 def get_data():
@@ -55,6 +56,11 @@ def get_data():
 
         latitude = request.form['lat']
         longitude = request.form['lon']
+        timestamp = int(request.form['timestamp'])
+        timestamp /= 1000
+
+        formatted_timestamp = datetime.fromtimestamp(timestamp).strftime("%d/%m %H:%M")
+        # print(formatted_timestamp)
 
         location_aqi = latlon2aqi(latitude, longitude)
         location_place = latlon2address(latitude, longitude)
@@ -65,11 +71,11 @@ def get_data():
             os.remove(os.path.join(app.config['UPLOAD_FOLDER'], uploaded_file.filename))
             return response
 
-        processed_image = process_image((os.path.join(app.config['UPLOAD_FOLDER'], uploaded_file.filename)), location_place, location_aqi)
+        processed_image = process_image((os.path.join(app.config['UPLOAD_FOLDER'], uploaded_file.filename)), location_place, location_aqi, formatted_timestamp)
         processed_image.save(os.path.join(app.config['UPLOAD_FOLDER'], 'filtered_' + uploaded_file.filename))
         # cv2.imwrite(os.path.join(app.config['UPLOAD_FOLDER'], 'filtered_' + uploaded_file.filename), processed_image)
 
-        original_image = process_image((os.path.join(app.config['UPLOAD_FOLDER'], uploaded_file.filename)), location_place, location_aqi, True)
+        original_image = process_image((os.path.join(app.config['UPLOAD_FOLDER'], uploaded_file.filename)), location_place, location_aqi, formatted_timestamp, True)
         original_image.save(os.path.join(app.config['UPLOAD_FOLDER'], uploaded_file.filename))
 
         response = make_response("Success!", 200)
@@ -122,9 +128,10 @@ def latlon2address(lat, lon):
     if locations:
         locations_list = locations.raw['address_components']
 
-        # filter locations_list and find locality type
         for location in locations_list:
-            if 'locality' in location['types']:
+            if 'locality' in location['types'] or \
+                'administrative_area_level_2' in location['types'] \
+                or 'postal_town' in location['types']:
                 # print (location['long_name'])
                 return location['long_name']
 
@@ -146,6 +153,9 @@ def latlon2aqi(lat, lon):
     data = sensor_data_to_loc_aqi(filter_non_air_sensors(response))
     if len(data) == 0:
         return -1
+
+    data = [t for t in data if None not in t]
+    # print (data)
     closest_sensor = sort_closest_data(lat, lon, data)[0]
     return max(closest_sensor[2], closest_sensor[3])
 
@@ -160,7 +170,7 @@ def calc_aqi(sensor):
         # remove outliers from data
         if float(p1) >= 1999.90:
             p1 = None
-    except:
+    except Exception as e:
         p1 = None
 
     try:
@@ -172,16 +182,18 @@ def calc_aqi(sensor):
         # remove outliers from data
         if float(p2) >= 999.90:
             p2 = None
-    except:
+    except Exception as e:
         p2 = None
 
-    if p1 != None and p2 != None:
+    if p1 != None:
         p1 = float(p1)
+    if p2 != None:
         p2 = float(p2)
-    else:
-        return -1, -1
 
     def get_p2_formula_data(conc):
+        if conc == None:
+            return None
+
         # conc = float(conc)
         if 0 < conc <= 12:
             return 0, 12, 0, 50
@@ -220,7 +232,14 @@ def calc_aqi(sensor):
     def formula(conc, conc_l, conc_h, aqi_l, aqi_h):
         return int(((aqi_h - aqi_l) / (conc_h - conc_l)) * (conc - conc_l) + aqi_l)
 
-    return formula(p1, *get_p1_formula_data(p1)), formula(p2, *get_p2_formula_data(p2))
+    if p1 == None and p2 == None:
+        return None, None
+    if p1 == None:
+        return None, formula(p2, *get_p2_formula_data(p2))
+    elif p2 == None:
+        return formula(p1, *get_p1_formula_data(p1)), None
+    else:
+        return formula(p1, *get_p1_formula_data(p1)), formula(p2, *get_p2_formula_data(p2))
 
 
 def closest(data, v):
@@ -233,8 +252,6 @@ def filter_non_air_sensors(data):
 
 
 def sensor_data_to_loc_aqi(data):
-    # TODO
-    # Catch p1 p2 none/-2 values !!!
     return list(
         map(lambda x: (float(x['location']['latitude']), float(x['location']['longitude']), *calc_aqi(x)), data))
 

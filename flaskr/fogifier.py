@@ -232,10 +232,10 @@ def write_overlay_text(image, location, timestamp, pollution_level, typeface):
   return image
 
 
-def process_image(image_path, location, pollution_level, original=False, debug=False):
+def process_image(image_path, location, pollution_level, timestamp, original=False, debug=False):
 
-    timestamp = datetime.now()
-    timestamp = timestamp.strftime("%d/%m %H:%M")
+    # timestamp = datetime.now()
+    # timestamp = timestamp.strftime("%d/%m %H:%M")
 
     # This is the "main" method
     
