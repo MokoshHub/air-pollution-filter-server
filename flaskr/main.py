@@ -37,14 +37,14 @@ app.config.from_mapping(
 @app.route('/', methods=['GET'])
 @cross_origin()
 def hello():
-    return redirect('http://localhost:4200/')
-    # return render_template('index.html')
+    # return redirect('http://localhost:4200/')
+    return render_template('index.html')
     
 # render website page with image
 @app.route('/image/<image_name>')
 def load_image(image_name):
-    return redirect('http://localhost:4200/')
-    # return render_template('index.html')
+    # return redirect('http://localhost:4200/')
+    return render_template('index.html')
 
 @app.route('/', methods=['POST'])
 def get_data():
