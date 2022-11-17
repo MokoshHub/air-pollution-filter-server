@@ -10,53 +10,64 @@ from flask import Flask, jsonify, redirect, request, make_response, render_templ
 from flask_cors import CORS, cross_origin
 from dotenv import load_dotenv
 from geopy.geocoders import GoogleV3
+
 load_dotenv()
 import requests
 import logging
 import google.cloud.logging
 
-if (not os.path.exists(os.path.join(os.getenv('FLASKR_ROOT'), 'uploaded_images'))):
-    os.mkdir(os.path.join(os.getenv('FLASKR_ROOT'), 'uploaded_images'))
+if not os.path.exists(os.path.join(os.getenv("FLASKR_ROOT"), "uploaded_images")):
+    os.mkdir(os.path.join(os.getenv("FLASKR_ROOT"), "uploaded_images"))
 
 client = google.cloud.logging.Client()
 client.setup_logging()
 
-app = Flask(__name__, instance_relative_config=True, static_folder='./static', template_folder='./static')
+app = Flask(
+    __name__,
+    instance_relative_config=True,
+    static_folder="./static",
+    template_folder="./static",
+)
 # app = Flask(__name__, instance_relative_config=True)
 
 cors = CORS(app)
 
-app.config['CORS_HEADERS'] = 'Content-Type'
-app.config['UPLOAD_FOLDER'] = os.path.join(os.getenv('FLASKR_ROOT'), 'uploaded_images')
+app.config["CORS_HEADERS"] = "Content-Type"
+app.config["UPLOAD_FOLDER"] = os.path.join(os.getenv("FLASKR_ROOT"), "uploaded_images")
 
 app.config.from_mapping(
-    SECRET_KEY='dev',
-    DATABASE=os.path.join(app.instance_path, 'flaskr.sqlite'),
+    SECRET_KEY="dev",
+    DATABASE=os.path.join(app.instance_path, "flaskr.sqlite"),
 )
 
-@app.route('/', methods=['GET'])
+
+@app.route("/", methods=["GET"])
 @cross_origin()
 def hello():
     # return redirect('http://localhost:4200/')
-    return render_template('index.html')
-    
+    return render_template("index.html")
+
+
 # render website page with image
-@app.route('/image/<image_name>')
+@app.route("/image/<image_name>")
 def load_image(image_name):
     # return redirect('http://localhost:4200/')
-    return render_template('index.html')
+    return render_template("index.html")
 
-@app.route('/', methods=['POST'])
+
+@app.route("/", methods=["POST"])
 def get_data():
     try:
-        uploaded_file = request.files['file']
+        uploaded_file = request.files["file"]
 
-        uploaded_file.save(os.path.join(app.config['UPLOAD_FOLDER'], uploaded_file.filename))
+        uploaded_file.save(
+            os.path.join(app.config["UPLOAD_FOLDER"], uploaded_file.filename)
+        )
         uploaded_file.close()
 
-        latitude = request.form['lat']
-        longitude = request.form['lon']
-        timestamp = int(request.form['timestamp'])
+        latitude = request.form["lat"]
+        longitude = request.form["lon"]
+        timestamp = int(request.form["timestamp"])
         timestamp /= 1000
 
         formatted_timestamp = datetime.fromtimestamp(timestamp).strftime("%d/%m %H:%M")
@@ -68,15 +79,32 @@ def get_data():
         if location_aqi == -1:
             response = make_response("I'm a teapot", 418)
             response.mimetype = "text/plain"
-            os.remove(os.path.join(app.config['UPLOAD_FOLDER'], uploaded_file.filename))
+            os.remove(os.path.join(app.config["UPLOAD_FOLDER"], uploaded_file.filename))
             return response
 
-        processed_image = process_image((os.path.join(app.config['UPLOAD_FOLDER'], uploaded_file.filename)), location_place, location_aqi, formatted_timestamp)
-        processed_image.save(os.path.join(app.config['UPLOAD_FOLDER'], 'filtered_' + uploaded_file.filename))
+        processed_image = process_image(
+            (os.path.join(app.config["UPLOAD_FOLDER"], uploaded_file.filename)),
+            location_place,
+            location_aqi,
+            formatted_timestamp,
+        )
+        processed_image.save(
+            os.path.join(
+                app.config["UPLOAD_FOLDER"], "filtered_" + uploaded_file.filename
+            )
+        )
         # cv2.imwrite(os.path.join(app.config['UPLOAD_FOLDER'], 'filtered_' + uploaded_file.filename), processed_image)
 
-        original_image = process_image((os.path.join(app.config['UPLOAD_FOLDER'], uploaded_file.filename)), location_place, location_aqi, formatted_timestamp, True)
-        original_image.save(os.path.join(app.config['UPLOAD_FOLDER'], uploaded_file.filename))
+        original_image = process_image(
+            (os.path.join(app.config["UPLOAD_FOLDER"], uploaded_file.filename)),
+            location_place,
+            location_aqi,
+            formatted_timestamp,
+            True,
+        )
+        original_image.save(
+            os.path.join(app.config["UPLOAD_FOLDER"], uploaded_file.filename)
+        )
 
         response = make_response("Success!", 200)
         response.mimetype = "text/plain"
@@ -84,69 +112,81 @@ def get_data():
     except Exception as e:
         logging.error(e, exc_info=True)
 
-        os.remove(os.path.join(app.config['UPLOAD_FOLDER'], uploaded_file.filename))
+        os.remove(os.path.join(app.config["UPLOAD_FOLDER"], uploaded_file.filename))
         response = make_response("Internal error", 500)
         response.mimetype = "text/plain"
 
     return response
 
+
 def get_response_image(image_path):
-    with Image.open(image_path, mode='r') as im:
-        pil_img = im.convert('RGB')
+    with Image.open(image_path, mode="r") as im:
+        pil_img = im.convert("RGB")
         byte_arr = io.BytesIO()
-        pil_img.save(byte_arr, format='JPEG')
-        encoded_img = encodebytes(byte_arr.getvalue()).decode('ascii')
+        pil_img.save(byte_arr, format="JPEG")
+        encoded_img = encodebytes(byte_arr.getvalue()).decode("ascii")
     return encoded_img
 
+
 # send image back to fontend
-@app.route('/send_image/<image_name>')
+@app.route("/send_image/<image_name>")
 def send_image(image_name):
     encoded_imges = []
 
     try:
-        result = [os.path.join(app.config['UPLOAD_FOLDER'], 'filtered_' + image_name), os.path.join(app.config['UPLOAD_FOLDER'], image_name)]
+        result = [
+            os.path.join(app.config["UPLOAD_FOLDER"], "filtered_" + image_name),
+            os.path.join(app.config["UPLOAD_FOLDER"], image_name),
+        ]
 
         for image_path in result:
             encoded_imges.append(get_response_image(image_path))
 
-        image_path = ''
+        image_path = ""
 
         # delete images from local storage
-        os.remove(os.path.join(app.config['UPLOAD_FOLDER'], 'filtered_' + image_name))
-        os.remove(os.path.join(app.config['UPLOAD_FOLDER'], image_name))
+        os.remove(os.path.join(app.config["UPLOAD_FOLDER"], "filtered_" + image_name))
+        os.remove(os.path.join(app.config["UPLOAD_FOLDER"], image_name))
     except Exception:
-        print (sys.exc_info())
+        print(sys.exc_info())
         result = None
-        
-    return jsonify({'result': encoded_imges})
+
+    return jsonify({"result": encoded_imges})
 
 
 def latlon2address(lat, lon):
-    geolocator = GoogleV3(api_key=os.getenv('GEOLOCATOR_API_KEY'))
+    geolocator = GoogleV3(api_key=os.getenv("GEOLOCATOR_API_KEY"))
     locations = geolocator.reverse("{}, {}".format(lat, lon), exactly_one=True)
 
     if locations:
-        locations_list = locations.raw['address_components']
+        locations_list = locations.raw["address_components"]
 
         for location in locations_list:
-            if 'locality' in location['types'] or \
-                'administrative_area_level_2' in location['types'] \
-                or 'postal_town' in location['types']:
+            if (
+                "locality" in location["types"]
+                or "administrative_area_level_2" in location["types"]
+                or "postal_town" in location["types"]
+            ):
                 # print (location['long_name'])
-                return location['long_name']
+                return location["long_name"]
+
 
 def latlon2city(lat, lon):
-    aqi_api_url = "https://api.waqi.info/feed/geo:{};{}/?token={}".format(lat, lon, os.getenv('AIR_POLLUTION_TOKEN'))
+    aqi_api_url = "https://api.waqi.info/feed/geo:{};{}/?token={}".format(
+        lat, lon, os.getenv("AIR_POLLUTION_TOKEN")
+    )
     air_pollution_data = requests.get(aqi_api_url).json()
 
     # print ("Adresa: " + air_pollution_data)
 
-    location_place = air_pollution_data['data']['city']['name']
+    location_place = air_pollution_data["data"]["city"]["name"]
     return location_place
 
 
 def latlon2aqi(lat, lon):
-    aqi_api_url = "https://data.sensor.community/airrohr/v1/filter/area={},{},10".format(lat, lon)
+    aqi_api_url = (
+        "https://data.sensor.community/airrohr/v1/filter/area={},{},10".format(lat, lon)
+    )
     response = requests.get(aqi_api_url).json()
     if len(response) == 0:
         return -1
@@ -159,13 +199,14 @@ def latlon2aqi(lat, lon):
     closest_sensor = sort_closest_data(lat, lon, data)[0]
     return max(closest_sensor[2], closest_sensor[3])
 
+
 def calc_aqi(sensor):
-    
+
     try:
-        if sensor['sensordatavalues'][0]['value_type'] == 'P1':
-            p1 = sensor['sensordatavalues'][0]['value']
-        elif sensor['sensordatavalues'][1]['value_type'] == 'P1':
-            p1 = sensor['sensordatavalues'][1]['value']
+        if sensor["sensordatavalues"][0]["value_type"] == "P1":
+            p1 = sensor["sensordatavalues"][0]["value"]
+        elif sensor["sensordatavalues"][1]["value_type"] == "P1":
+            p1 = sensor["sensordatavalues"][1]["value"]
 
         # remove outliers from data
         if float(p1) >= 1999.90:
@@ -174,10 +215,10 @@ def calc_aqi(sensor):
         p1 = None
 
     try:
-        if sensor['sensordatavalues'][0]['value_type'] == 'P2':
-            p2 = sensor['sensordatavalues'][0]['value']
-        elif sensor['sensordatavalues'][1]['value_type'] == 'P2':
-            p2 = sensor['sensordatavalues'][1]['value']
+        if sensor["sensordatavalues"][0]["value_type"] == "P2":
+            p2 = sensor["sensordatavalues"][0]["value"]
+        elif sensor["sensordatavalues"][1]["value_type"] == "P2":
+            p2 = sensor["sensordatavalues"][1]["value"]
 
         # remove outliers from data
         if float(p2) >= 999.90:
@@ -239,21 +280,47 @@ def calc_aqi(sensor):
     elif p2 == None:
         return formula(p1, *get_p1_formula_data(p1)), None
     else:
-        return formula(p1, *get_p1_formula_data(p1)), formula(p2, *get_p2_formula_data(p2))
+        return formula(p1, *get_p1_formula_data(p1)), formula(
+            p2, *get_p2_formula_data(p2)
+        )
 
 
 def closest(data, v):
-    return min(data, key=lambda p: distance(v['lat'], v['lon'], float(p['location']['latitude']), float(p['location']['longitude'])))
+    return min(
+        data,
+        key=lambda p: distance(
+            v["lat"],
+            v["lon"],
+            float(p["location"]["latitude"]),
+            float(p["location"]["longitude"]),
+        ),
+    )
 
 
 def filter_non_air_sensors(data):
-    aux = [x if any('P1' == y['value_type'] or 'P2' == y['value_type'] for y in x['sensordatavalues']) else None for x in data]
+    aux = [
+        x
+        if any(
+            "P1" == y["value_type"] or "P2" == y["value_type"]
+            for y in x["sensordatavalues"]
+        )
+        else None
+        for x in data
+    ]
     return list(filter(lambda x: x is not None, aux))
 
 
 def sensor_data_to_loc_aqi(data):
     return list(
-        map(lambda x: (float(x['location']['latitude']), float(x['location']['longitude']), *calc_aqi(x)), data))
+        map(
+            lambda x: (
+                float(x["location"]["latitude"]),
+                float(x["location"]["longitude"]),
+                *calc_aqi(x),
+            ),
+            data,
+        )
+    )
 
 
 def sort_closest_data(lat, lon, data):
@@ -269,8 +336,13 @@ def distance(lat1, lon1, lat2, lon2):
     lat2 = float(lat2)
     lon2 = float(lon2)
 
-    hav = 0.5 - cos((lat2-lat1)*p)/2 + cos(lat1*p)*cos(lat2*p) * (1-cos((lon2-lon1)*p)) / 2
+    hav = (
+        0.5
+        - cos((lat2 - lat1) * p) / 2
+        + cos(lat1 * p) * cos(lat2 * p) * (1 - cos((lon2 - lon1) * p)) / 2
+    )
     return 12742 * asin(sqrt(hav))
+
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=8080)
