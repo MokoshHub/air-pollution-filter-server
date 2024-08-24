@@ -5,22 +5,26 @@ import sys
 from PIL import Image
 import cv2
 from datetime import datetime
+
+import numpy as np
 from fogifier import process_image
 from flask import Flask, jsonify, redirect, request, make_response, render_template
 from flask_cors import CORS, cross_origin
 from dotenv import load_dotenv
 from geopy.geocoders import GoogleV3
-
-load_dotenv()
 import requests
 import logging
 import google.cloud.logging
 
-if not os.path.exists(os.path.join(os.getenv("FLASKR_ROOT"), "uploaded_images")):
-    os.mkdir(os.path.join(os.getenv("FLASKR_ROOT"), "uploaded_images"))
-
 client = google.cloud.logging.Client()
 client.setup_logging()
+
+logging.getLogger('google.cloud').setLevel(logging.ERROR)
+
+load_dotenv()
+
+if not os.path.exists(os.path.join(os.getenv("FLASKR_ROOT"), "uploaded_images")):
+    os.mkdir(os.path.join(os.getenv("FLASKR_ROOT"), "uploaded_images"))
 
 app = Flask(
     __name__,
@@ -30,7 +34,7 @@ app = Flask(
 )
 # app = Flask(__name__, instance_relative_config=True)
 
-cors = CORS(app)
+cors = CORS(app, resources={r"/*": {"origins": "*"}})
 
 app.config["CORS_HEADERS"] = "Content-Type"
 app.config["UPLOAD_FOLDER"] = os.path.join(os.getenv("FLASKR_ROOT"), "uploaded_images")
@@ -40,20 +44,17 @@ app.config.from_mapping(
     DATABASE=os.path.join(app.instance_path, "flaskr.sqlite"),
 )
 
-
 @app.route("/", methods=["GET"])
 @cross_origin()
 def hello():
     # return redirect('http://localhost:4200/')
     return render_template("index.html")
 
-
 # render website page with image
 @app.route("/image/<image_name>")
 def load_image(image_name):
     # return redirect('http://localhost:4200/')
     return render_template("index.html")
-
 
 @app.route("/", methods=["POST"])
 def get_data():
@@ -71,7 +72,6 @@ def get_data():
         timestamp /= 1000
 
         formatted_timestamp = datetime.fromtimestamp(timestamp).strftime("%d/%m %H:%M")
-        # print(formatted_timestamp)
 
         location_aqi = latlon2aqi(latitude, longitude)
         location_place = latlon2address(latitude, longitude)
@@ -93,7 +93,11 @@ def get_data():
                 app.config["UPLOAD_FOLDER"], "filtered_" + uploaded_file.filename
             )
         )
-        # cv2.imwrite(os.path.join(app.config['UPLOAD_FOLDER'], 'filtered_' + uploaded_file.filename), processed_image)
+
+        processed_image = np.array(processed_image)
+        processed_image = cv2.cvtColor(processed_image, cv2.COLOR_RGB2BGR)
+
+        cv2.imwrite(os.path.join(app.config['UPLOAD_FOLDER'], 'filtered_' + uploaded_file.filename), processed_image)
 
         original_image = process_image(
             (os.path.join(app.config["UPLOAD_FOLDER"], uploaded_file.filename)),
@@ -111,6 +115,8 @@ def get_data():
         logging.info("Success!")
     except Exception as e:
         logging.error(e, exc_info=True)
+
+        print (sys.exc_info())
 
         os.remove(os.path.join(app.config["UPLOAD_FOLDER"], uploaded_file.filename))
         response = make_response("Internal error", 500)
@@ -148,7 +154,7 @@ def send_image(image_name):
         os.remove(os.path.join(app.config["UPLOAD_FOLDER"], "filtered_" + image_name))
         os.remove(os.path.join(app.config["UPLOAD_FOLDER"], image_name))
     except Exception:
-        print(sys.exc_info())
+        # print(sys.exc_info())
         result = None
 
     return jsonify({"result": encoded_imges})
@@ -177,7 +183,7 @@ def latlon2city(lat, lon):
     )
     air_pollution_data = requests.get(aqi_api_url).json()
 
-    # print ("Adresa: " + air_pollution_data)
+    print ("Adresa: " + air_pollution_data)
 
     location_place = air_pollution_data["data"]["city"]["name"]
     return location_place
@@ -236,7 +242,7 @@ def calc_aqi(sensor):
             return None
 
         # conc = float(conc)
-        if 0 < conc <= 12:
+        if 0 <= conc <= 12:
             return 0, 12, 0, 50
         elif 12 < conc <= 35.5:
             return 12, 35.5, 51, 100
@@ -254,7 +260,7 @@ def calc_aqi(sensor):
 
     def get_p1_formula_data(conc):
         # conc = float(conc)
-        if 0 < conc <= 55:
+        if 0 <= conc <= 55:
             return 0, 55, 0, 50
         elif 55 < conc <= 155:
             return 55, 155, 51, 100

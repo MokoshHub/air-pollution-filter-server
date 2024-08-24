@@ -208,10 +208,14 @@ def add_frame_and_tab(image, pollution_level=100):
 
 
 def find_font_size(text, text_size_goal, image_size, typeface, debug=False):
-
     target_font_size = 1  # Starting font size for text fitting
     text_type = ImageFont.truetype(typeface, target_font_size)
-    while text_type.getsize(text)[1] < text_size_goal * image_size:
+    
+    # Create a dummy image to use ImageDraw
+    dummy_image = Image.new('RGB', (1, 1))
+    draw = ImageDraw.Draw(dummy_image)
+    
+    while draw.textbbox((0, 0), text, font=text_type)[3] < text_size_goal * image_size:
         # Iterate until the text size is just larger than the criteria
         target_font_size += 1
         if debug:
@@ -234,10 +238,13 @@ def write_overlay_text(image, location, timestamp, pollution_level, typeface):
     aqi_text_font = ImageFont.truetype(
         typeface, find_font_size(aqi_text, 0.075, image.height, typeface)
     )
-    aqi_text_width, aqi_text_height = draw.textsize(aqi_text, font=aqi_text_font)
-    aqi_number_text_width, aqi_number_text_height = draw.textsize(
-        aqi_values_text, font=aqi_text_font
-    )
+    aqi_text_bbox = draw.textbbox((0, 0), aqi_text, font=aqi_text_font)
+    aqi_text_width = aqi_text_bbox[2] - aqi_text_bbox[0]
+    aqi_text_height = aqi_text_bbox[3] - aqi_text_bbox[1]
+    
+    aqi_number_text_bbox = draw.textbbox((0, 0), aqi_values_text, font=aqi_text_font)
+    aqi_number_text_width = aqi_number_text_bbox[2] - aqi_number_text_bbox[0]
+    aqi_number_text_height = aqi_number_text_bbox[3] - aqi_number_text_bbox[1]
 
     draw.text(
         (
@@ -259,36 +266,40 @@ def write_overlay_text(image, location, timestamp, pollution_level, typeface):
         font=aqi_text_font,
     )
 
-    draw = ImageDraw.Draw(image)
     location_text = location[:]
     location_text_font = ImageFont.truetype(
         typeface, find_font_size(location_text, 0.035, image.height, typeface)
     )
-    text_width, text_height = draw.textsize(location_text, font=location_text_font)
+    location_text_bbox = draw.textbbox((0, 0), location_text, font=location_text_font)
+    text_width = location_text_bbox[2] - location_text_bbox[0]
+    text_height = location_text_bbox[3] - location_text_bbox[1]
+    
     draw.text(
-        ((image.width - text_width) / 2, ((image.height - text_height) * 0.93625)),
+        ((image.width - text_width) / 2, ((image.height - text_height) * 0.9275)),
         location_text,
         fill="#ffffff",
         font=location_text_font,
     )
 
     timestamp_text_font = location_text_font
-    text_width, text_height = draw.textsize(timestamp, font=timestamp_text_font)
+    timestamp_text_bbox = draw.textbbox((0, 0), timestamp, font=timestamp_text_font)
+    text_width = timestamp_text_bbox[2] - timestamp_text_bbox[0]
+    text_height = timestamp_text_bbox[3] - timestamp_text_bbox[1]
+    
     draw.text(
-        ((image.width - text_width) / 2, ((image.height - text_height) * 0.99)),
+        ((image.width - text_width) / 2, ((image.height - text_height) * 0.9775)),
         timestamp,
         fill="#ffffff",
         font=timestamp_text_font,
     )
 
+    # Convert the image back to a NumPy array
     image = np.array(image)
 
     return image
 
-
 def process_image(
-    image_path, location, pollution_level, timestamp, original=False, debug=False
-):
+    image_path, location, pollution_level, timestamp, original=False, debug=False):
 
     # timestamp = datetime.now()
     # timestamp = timestamp.strftime("%d/%m %H:%M")
@@ -312,18 +323,22 @@ def process_image(
     else:
 
         # Avoiding division by 0 here:
-        pollution_level = 1 if (pollution_level == 0) else pollution_level
+        # pollution_level = 1 if (pollution_level == 0) else pollution_level
 
         # Method picks a random fog overlay image and runs a calculation
         # to modify the blend opacity of fog to main photo
         fog_overlay_img = random.choice(
             os.listdir(os.path.join(os.getenv("FLASKR_ROOT"), "Fogs"))
         )
-        fog_opacity = (
-            1
-            if (log(1 / (pollution_level / 100) + 1) > 1)
-            else log(1 / (pollution_level / 100) + 1)
-        )
+
+        if pollution_level == 0:
+            fog_opacity = 1
+        else:
+            fog_opacity = (
+                1
+                if (log(1 / (pollution_level / 100) + 1) > 1)
+                else log(1 / (pollution_level / 100) + 1)
+            )
 
         raw_image = load_image(image_path)
         fogified_image = fogify_image(
@@ -359,9 +374,8 @@ def process_image(
     final_image = Image.fromarray(final_image)
     return final_image
 
-
 # process_image("https://upload.wikimedia.org/wikipedia/commons/thumb/8/88/New-York-Jan2005.jpg/1280px-New-York-Jan2005.jpg",
 #               "NYC",
-#               500,
+#               310,
 #               False,
-#               True)
+#               debug=True)
